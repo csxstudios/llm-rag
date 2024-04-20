@@ -4,7 +4,12 @@ Implementing RAG with Chroma and Llama 2
 - Explore how word embeddings work and the role of Chroma in improving the precision of text generation (chroma.ipynb)
 
 Building a Local Chatbot w/ Langchain and Llama
+- local-chatbot.ipynb
 - https://medium.com/@weidagang/hello-llm-building-a-local-chatbot-with-langchain-and-llama2-3a4449fc4c03
+
+Building an LLM RAG Chatbot With Langchain
+- local-chatbot-rag.ipynb
+- https://realpython.com/build-llm-rag-chatbot-with-langchain/
 
 Get currenty directory
 ```bash

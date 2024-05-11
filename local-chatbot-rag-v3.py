@@ -23,8 +23,11 @@ retriever = helpers.DocsToChroma(docs, False)
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
-llm_local = helpers.GetLocalLLM("MODEL_MIXTRAL_7B")
+# llm_mixtral = helpers.GetLocalLLM("MODEL_MIXTRAL_7B")
+# llm_llama3 = helpers.GetLocalLLM("MODEL_LLAMA3_8B")
 llm_groq = helpers.GetGroqLLM("mixtral-8x7b-32768")
+
+llm = llm_groq
 
 ### Contextualize question ###
 contextualize_q_system_prompt = """Given a chat history and the latest user question \
@@ -39,7 +42,7 @@ contextualize_q_prompt = ChatPromptTemplate.from_messages(
     ]
 )
 history_aware_retriever = create_history_aware_retriever(
-    llm_groq, retriever, contextualize_q_prompt
+    llm, retriever, contextualize_q_prompt
 )
 
 ### Answer question ###
@@ -56,7 +59,7 @@ qa_prompt = ChatPromptTemplate.from_messages(
         ("human", "{input}"),
     ]
 )
-question_answer_chain = create_stuff_documents_chain(llm_groq, qa_prompt)
+question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
 
 rag_chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
 

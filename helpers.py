@@ -82,14 +82,14 @@ def GetLocalLLM(model):
     llm_local = LlamaCpp(
         #Get local model path defined in .env
         model_path=os.getenv(model),
-        #n_gpu_layers=40,
+        n_gpu_layers=0, # The number of layers to offload to GPU, if you have GPU acceleration available. Set to 0 if no GPU acceleration is available on your system.
         temperature=0.2,
         top_k=40,
         repeat_penalty=1.1,
         top_p=0.95,
-        n_threads=4,
+        n_threads=4, # The number of CPU threads to use, tailor to your system and the resulting performance
         n_batch=512,  # Batch size for model processing
-        n_ctx=2048,
+        n_ctx=2048, # The max sequence length to use - note that longer sequence lengths require much more resources
         callback_manager=callback_manager,
         verbose=False,  # Verbose is required to pass to the callback manager
     )

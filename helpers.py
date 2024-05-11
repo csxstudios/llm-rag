@@ -12,6 +12,8 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     ChatPromptTemplate,
 )
+from langchain.chains import LLMChain, RetrievalQAWithSourcesChain, ConversationalRetrievalChain
+from flask import jsonify
 
 CHROMA_DATA_PATH = "chroma/"
 
@@ -52,6 +54,23 @@ def TextToChroma(text, isRebuild):
         print("Completed chroma vector db")
 
     retriever = Chroma(embedding_function=embeddings,persist_directory=CHROMA_DATA_PATH)
+
+    return retriever
+
+def DocsToChroma(docs, isRebuild):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splits = text_splitter.split_documents(docs)
+
+    embeddings = LlamaCppEmbeddings(model_path=os.getenv("MODEL_NOMIC_EMBED_TEXT"))
+
+    if isRebuild:
+        #rebuild the chroma db
+        vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings,persist_directory=CHROMA_DATA_PATH)
+    else:
+        vectorstore = Chroma(embedding_function=embeddings,persist_directory=CHROMA_DATA_PATH)
+
+    # Retrieve and generate using the relevant snippets of the blog.
+    retriever = vectorstore.as_retriever()
 
     return retriever
 
@@ -117,9 +136,33 @@ def SearchChroma(question, retriever):
     local_answer=retriever.similarity_search(question, k=3)
     print(local_answer, '\n')
 
+# Create an LLMChain to manage interactions with the prompt and model
+def CreateLLMChain(prompt_template, llm):
+    llm_chain = LLMChain(
+        prompt=prompt_template,
+        llm = llm
+        )
+
 def RunAppLocal(llm_chain):
     while True:
         question = input("> ")
         context = context
         answer = llm_chain.invoke({"context": context, "question": question})
         print(answer, '\n')
+
+def GetSources(res):
+    # Process source documents if available
+    sources = [] # Initialize list to store text elements
+    if res['context']:
+        for source_idx, source_doc in enumerate(res['context']):
+            source_name = f"source_{source_idx}"
+            # Create the text element referenced in the message
+            print(source_doc)
+            sources.append(
+                 {
+                    'page_content': source_doc.page_content,
+                    'name': source_name,                    
+                    'metadata': source_doc.metadata
+                }
+            )
+    return sources

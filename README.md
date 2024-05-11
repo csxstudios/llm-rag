@@ -16,6 +16,10 @@ Building a RAG Chatbot with PDFs
 - https://github.com/sudarshan-koirala/rag-chat-with-pdf/
 - https://console.groq.com/docs/showcase-applications
 
+Chain w/ Chat History Returning Sources
+- local-chatbot-rag-v3.py
+- https://python.langchain.com/v0.1/docs/use_cases/question_answering/chat_history/
+
 Get currenty directory
 ```bash
 import os

@@ -4,8 +4,8 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain.memory import ChatMessageHistory, ConversationBufferMemory
-from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ChatMessageHistory
+from langchain.load.dump import dumps
 from flask import Flask, request, session, jsonify
 from dotenv import load_dotenv
 import helpers
@@ -81,13 +81,6 @@ conversational_rag_chain = RunnableWithMessageHistory(
 
 print("Chatbot initialized, ready to chat...")
 
-# answer = conversational_rag_chain.invoke(
-#     {"input": "What is a naked short put?"},
-#     config={
-#         "configurable": {"session_id": "abc123"}
-#     },  # constructs a key "abc123" in `store`.
-# )["answer"]
-
 @app.route('/query', methods=['POST'])
 def query():
     # global retrieval_chain
@@ -95,13 +88,13 @@ def query():
     data = request.json
     query = data.get('query')
     print("Query: " + query)
-    #local_answer=helpers.SearchChroma(query, retriever)
     res = conversational_rag_chain.invoke(
         {"input": query},
         config={
             "configurable": {"session_id": "abc123"}
-        },  # constructs a key "abc123" in `store`.
+        },
     )
+    print("Response: " + dumps(res))
     sources = helpers.GetSources(res)
     return jsonify(answer=res['answer'], sources=sources), 200
 

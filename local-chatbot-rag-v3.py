@@ -97,7 +97,7 @@ def query():
         },
     )
     print("Response: " + dumps(res))
-    sources = helpers.GetSources(res)
+    sources = helpers.get_sources(res)
     return jsonify(answer=res['answer'], sources=sources), 200
 
 if __name__ == '__main__':

@@ -19,6 +19,7 @@ Building a RAG Chatbot with PDFs
 Chain w/ Chat History Returning Sources
 - local-chatbot-rag-v3.py
 - https://python.langchain.com/v0.1/docs/use_cases/question_answering/chat_history/
+- https://python.langchain.com/v0.1/docs/use_cases/question_answering/sources/
 
 Get currenty directory
 ```bash

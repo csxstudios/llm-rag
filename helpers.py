@@ -1,6 +1,10 @@
 import os
 import PyPDF2
+import bs4
+import pandas as pd
+from sqlalchemy import create_engine, inspect
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import TextLoader, WebBaseLoader
 from langchain_community.embeddings import LlamaCppEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.llms import LlamaCpp
@@ -17,47 +21,16 @@ from flask import jsonify
 
 CHROMA_DATA_PATH = "chroma/"
 
-#Parse TXT file to text
-def TxtToText(filePath):
-    with open('./data/NOTES.txt', 'r') as file:
-        txt_text = file.read()
-    
-    return txt_text
-
 #Parse PDF file to text
-def PdfToText(filePath):
-    pdf = PyPDF2.PdfReader(filePath)
+def pdf_to_txt(file_path):
+    pdf = PyPDF2.PdfReader(file_path)
     pdf_text = ""
     for page in pdf.pages:
         pdf_text += page.extract_text()
 
     return pdf_text
 
-#Text to local chroma vector db
-def TextToChroma(text, isRebuild):
-    # Split the text into chunks
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    texts = text_splitter.split_text(text)
-
-    # Create a metadata for each chunk
-    metadatas = [{"source": f"{i}-pl"} for i in range(len(texts))]
-
-    embeddings = LlamaCppEmbeddings(model_path=os.getenv("MODEL_NOMIC_EMBED_TEXT"))
-    #embeddings = OllamaEmbeddings(model="llama2:7b")
-
-    if isRebuild:
-        print("Building local chroma vector db...")
-        #rebuild the chroma db
-        retriever = Chroma.from_texts(
-            texts, embeddings, metadatas=metadatas, persist_directory=CHROMA_DATA_PATH
-        )
-        print("Completed chroma vector db")
-
-    retriever = Chroma(embedding_function=embeddings,persist_directory=CHROMA_DATA_PATH)
-
-    return retriever
-
-def DocsToChroma(docs, isRebuild):
+def docs_to_chroma(docs, isRebuild):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     splits = text_splitter.split_documents(docs)
 
@@ -70,11 +43,28 @@ def DocsToChroma(docs, isRebuild):
         vectorstore = Chroma(embedding_function=embeddings,persist_directory=CHROMA_DATA_PATH)
 
     # Retrieve and generate using the relevant snippets of the blog.
-    retriever = vectorstore.as_retriever()
+    retriever = vectorstore
 
     return retriever
 
-def GetLocalLLM(model):
+def site_to_doc(url):
+    # Load, chunk and index the contents of the blog.
+    bs_strainer = bs4.SoupStrainer(class_=("post-content", "post-title", "post-header"))
+    loader = WebBaseLoader(
+        web_paths=(url,),
+        bs_kwargs={"parse_only": bs_strainer},
+    )
+    docs = loader.load()
+
+    return docs
+
+def txt_to_doc(file_path):
+    loader = TextLoader(file_path)
+    # loader = TextLoader("./data/NOTES.txt")
+    docs = loader.load()
+    return docs
+
+def get_local_llm(model):
     # Callbacks support token-wise streaming
     callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
 
@@ -96,21 +86,22 @@ def GetLocalLLM(model):
 
     return llm_local
 
-def GetGroqLLM(model):
+def get_groq_llm(model):
     llm_groq = ChatGroq(
             groq_api_key=os.getenv("GROQ_API_KEY"),
             #model_name='llama2-70b-4096' 
-            model_name=model
+            model_name=model,
+            temperature=0
     )
 
     return llm_groq
 
-def CreatePromptTemplate(systemPrompt):
+def create_prompt_template(system_prompt):
     system_template_str = "[INST]"
-    system_template_str += systemPrompt
+    system_template_str += system_prompt
     system_template_str += " Context: {context}[/INST]"
 
-    system_prompt = SystemMessagePromptTemplate(
+    new_system_prompt = SystemMessagePromptTemplate(
     prompt=PromptTemplate(
         input_variables=["context"],
         template=system_template_str,
@@ -123,7 +114,7 @@ def CreatePromptTemplate(systemPrompt):
             template="{question}",
         )
     )
-    messages = [system_prompt, human_prompt]
+    messages = [new_system_prompt, human_prompt]
 
     prompt_template = ChatPromptTemplate(
         input_variables=["context", "question"],
@@ -132,25 +123,25 @@ def CreatePromptTemplate(systemPrompt):
 
     return prompt_template
 
-def SearchChroma(question, retriever):
+def search_chroma(question, retriever):
     local_answer=retriever.similarity_search(question, k=3)
     print(local_answer, '\n')
 
 # Create an LLMChain to manage interactions with the prompt and model
-def CreateLLMChain(prompt_template, llm):
+def create_llm_chain(prompt_template, llm):
     llm_chain = LLMChain(
         prompt=prompt_template,
         llm = llm
         )
 
-def RunAppLocal(llm_chain):
+def run_local_app(llm_chain):
     while True:
         question = input("> ")
         context = context
         answer = llm_chain.invoke({"context": context, "question": question})
         print(answer, '\n')
 
-def GetSources(res):
+def get_sources(res):
     # Process source documents if available
     sources = [] # Initialize list to store text elements
     if res['context']:
@@ -166,3 +157,13 @@ def GetSources(res):
                 }
             )
     return sources
+
+def csv_to_sql_db(full_file_path):
+    file = os.path.basename(full_file_path)
+    file_name, file_extension = os.path.splitext(file)
+    db_path = "sql/" + file_name + ".db"
+    db_path = f"sqlite:///{db_path}"
+    new_db = create_engine(db_path)
+    df = pd.read_csv(full_file_path)
+    df.to_sql(file_name, new_db, index=False)
+    print("All csv files are saved into the sql database.")

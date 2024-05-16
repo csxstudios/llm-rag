@@ -15,17 +15,16 @@ load_dotenv()
 app = Flask(__name__)
 
 # load the document and split it into chunks
-loader = TextLoader("./data/NOTES.txt")
-docs = loader.load()
+docs = helpers.txt_to_doc("./data/NOTES.txt")
 
-retriever = helpers.DocsToChroma(docs, False)
+retriever = helpers.docs_to_chroma(docs, False).as_retriever(search_kwargs={'k': 3})
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
 
 # llm_mixtral = helpers.GetLocalLLM("MODEL_MIXTRAL_7B")
 # llm_llama3 = helpers.GetLocalLLM("MODEL_LLAMA3_8B")
-llm_groq = helpers.GetGroqLLM("mixtral-8x7b-32768")
+llm_groq = helpers.get_groq_llm("mixtral-8x7b-32768")
 
 llm = llm_groq
 

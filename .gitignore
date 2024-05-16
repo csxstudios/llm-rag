@@ -162,3 +162,5 @@ cython_debug/
 #custom
 data/
 chroma/
+sql/
+#scratchpad.py

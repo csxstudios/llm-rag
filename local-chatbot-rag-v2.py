@@ -1,3 +1,4 @@
+from langchain_community.document_loaders import TextLoader, WebBaseLoader
 from langchain.memory import ChatMessageHistory, ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from flask import Flask, request, session, jsonify
@@ -8,9 +9,10 @@ load_dotenv()
 
 app = Flask(__name__)
 
-text = helpers.TxtToText('./data/NOTES.txt')
+# load the document and split it into chunks
+docs = helpers.txt_to_doc("./data/NOTES.txt")
 
-retriever = helpers.TextToChroma(text, False)
+retriever = helpers.docs_to_chroma(docs, False).as_retriever(search_kwargs={'k': 3})
 
 # Initialize message history for conversation
 message_history = ChatMessageHistory()
@@ -23,16 +25,16 @@ memory = ConversationBufferMemory(
     return_messages=True,
 )
 
-llm_local = helpers.GetLocalLLM("MODEL_MIXTRAL_7B")
-llm_groq = helpers.GetGroqLLM("mixtral-8x7b-32768")
+llm_local = helpers.get_local_llm("MODEL_MIXTRAL_7B")
+llm_groq = helpers.get_groq_llm("mixtral-8x7b-32768")
 
 # Define the prompt template with a placeholder for the question
 
-systemPrompt = "You are an expert wall street options trader. Your trading style is described in the following piece of context. Use it to answer the question at the end. If the question is not related to the context, politely respond that you are tuned to only answer questions that are related to the context. Be concise and only respond in the English language."
+system_prompt = "You are an expert wall street options trader. Your trading style is described in the following piece of context. Use it to answer the question at the end. If the question is not related to the context, politely respond that you are tuned to only answer questions that are related to the context. Be concise and only respond in the English language."
 
-prompt_template = helpers.CreatePromptTemplate(systemPrompt)
+prompt_template = helpers.create_prompt_template(system_prompt)
 
-context = retriever.as_retriever(search_kwargs={'k': 3})
+context = retriever
 
 # Create an LLMChain to manage interactions with the prompt and model
 # llm_chain = LLMChain(
@@ -58,7 +60,7 @@ def query():
     data = request.json
     query = data.get('query')
     print("Query: " + query)
-    #local_answer=helpers.SearchChroma(query, retriever)
+    #local_answer=helpers.search_chroma(query, retriever)
     res = llm_chain.invoke({"question": query})
     print(res, '\n')
     # Process source documents if available

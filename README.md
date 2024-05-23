@@ -33,3 +33,13 @@ print("Current directory:", current_directory)
 ## Other tutorials
 - https://youtu.be/cMJWC-csdK4?si=5kvA64ctvfqW2go6
 - https://youtu.be/TOeAe8KB68E?si=Gy3PD30U4QcZFRrF
+
+#Windows powershell commands for CUDA
+- Install Cuda 12.2 development toolkit
+- Install Microsoft Build Tools 2019 and choose C++ development for CMake
+```bash
+$env:CMAKE_ARGS="-DLLAMA_CUDA=on"
+$env:FORCE_CMAKE="1"
+$env:CUDA_VISIBLE_DEVICES="0"
+python -m pip install llama-cpp-python --force-reinstall --no-cache-dir --prefer-binary --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cuda122
+```

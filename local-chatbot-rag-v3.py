@@ -6,7 +6,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain.memory import ChatMessageHistory
 from langchain.load.dump import dumps
-from flask import Flask, request, session, jsonify
+from flask import Flask, request, session, jsonify, Response
 from dotenv import load_dotenv
 import helpers
 
@@ -15,12 +15,9 @@ load_dotenv()
 app = Flask(__name__)
 
 # load the document and split it into chunks
-docs = helpers.txt_to_doc("./data/NOTES.txt")
+# docs = helpers.txt_to_doc("./data/NOTES.txt")
 
-retriever = helpers.docs_to_chroma(docs, False).as_retriever(search_kwargs={'k': 3})
-
-def format_docs(docs):
-    return "\n\n".join(doc.page_content for doc in docs)
+retriever = helpers.get_vectorstore().as_retriever(search_kwargs={'k': 3})
 
 # llm_mixtral = helpers.GetLocalLLM("MODEL_MIXTRAL_7B")
 # llm_llama3 = helpers.GetLocalLLM("MODEL_LLAMA3_8B")
@@ -72,6 +69,10 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
         store[session_id] = ChatMessageHistory()
     return store[session_id]
 
+def clear_store():
+    store.clear()
+    print("Cleared chat history 'store'.")
+
 
 conversational_rag_chain = RunnableWithMessageHistory(
     rag_chain,
@@ -88,17 +89,35 @@ def query():
     # global retrieval_chain
     print("Incoming query...")
     data = request.json
+    ip = request.remote_addr
+    print("data",data)
     query = data.get('query')
-    print("Query: " + query)
+    session = data.get('session')
+    helpers.append_to_log(query, session, ip)
     res = conversational_rag_chain.invoke(
         {"input": query},
         config={
-            "configurable": {"session_id": "abc123"}
+            "configurable": {"session_id": session}
         },
     )
-    print("Response: " + dumps(res))
-    sources = helpers.get_sources(res)
-    return jsonify(answer=res['answer'], sources=sources), 200
+    if "I don't" in res['answer'] or "large language model" in res['answer'] or "I cannot" in res['answer'] or "I am" in res['answer'] or "My " in res['answer']:
+        clear_store()
+        res = {
+            "answer": "Unfortunately, I'm unable to provide an answer to your question at the moment. ",
+            "feedback": "However, I'm here to assist you as best as I can. Your input is crucial to my learning and development! If you would like to submit feedback on information that may help answer this type of question in the future, please select the Submit Feedback button to help me out."
+        }
+        return jsonify(answer=res['answer']), 200
+    else: 
+        clear_store()
+        print("Response: " + dumps(res))
+        sources = helpers.get_sources(res)
+        return jsonify(answer=res['answer'], sources=sources), 200
+    
+@app.route('/', methods=['GET'])
+def index():  # pragma: no cover
+    content = open('index.html').read()
+    return Response(content, mimetype="text/html")
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=True, host='0.0.0.0',port=port)

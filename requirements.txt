@@ -1,10 +1,12 @@
-os
 langchain
 langchain_community
 langchain_core
 PyPDF2
 chromadb
 langchain-groq
-flask
-dotenv
-flask
+Flask
+python-dotenv
+bs4
+pandas
+llama-cpp-python
+sqlalchemy

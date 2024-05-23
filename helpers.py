@@ -18,6 +18,7 @@ from langchain.prompts import (
 )
 from langchain.chains import LLMChain, RetrievalQAWithSourcesChain, ConversationalRetrievalChain
 from flask import jsonify
+from datetime import datetime
 
 CHROMA_DATA_PATH = "chroma/"
 
@@ -30,15 +31,28 @@ def pdf_to_txt(file_path):
 
     return pdf_text
 
-def docs_to_chroma(docs, isRebuild):
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    splits = text_splitter.split_documents(docs)
-
+def get_vectorstore():
+    print(os.getenv("MODEL_NOMIC_EMBED_TEXT"))
     embeddings = LlamaCppEmbeddings(model_path=os.getenv("MODEL_NOMIC_EMBED_TEXT"))
+    vectorstore = Chroma(embedding_function=embeddings,persist_directory=CHROMA_DATA_PATH)
+    return vectorstore
 
+def split_text_to_doc(full_file_path, metadatas):
+    loader = TextLoader(full_file_path)
+    docs = loader.load()
+    docs[0].metadata.update(metadatas)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    splits = text_splitter.split_documents(docs)
+    # for idx, text in enumerate(splits):
+    #     splits[idx].metadata.update(metadatas)
+    #     splits[idx].metadata['country'] = text.metadata['source'].split('/')[-4]
+    return splits
+
+def docs_to_chroma(docs, isRebuild):
+    embeddings = LlamaCppEmbeddings(model_path=os.getenv("MODEL_NOMIC_EMBED_TEXT"))
     if isRebuild:
         #rebuild the chroma db
-        vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings,persist_directory=CHROMA_DATA_PATH)
+        vectorstore = Chroma.from_documents(documents=docs, embedding=embeddings,persist_directory=CHROMA_DATA_PATH)
     else:
         vectorstore = Chroma(embedding_function=embeddings,persist_directory=CHROMA_DATA_PATH)
 
@@ -167,3 +181,15 @@ def csv_to_sql_db(full_file_path):
     df = pd.read_csv(full_file_path)
     df.to_sql(file_name, new_db, index=False)
     print("All csv files are saved into the sql database.")
+
+def append_to_log(string, session, ip):
+    log_date = datetime.today().strftime('%Y-%m-%d')
+    log_date_time = datetime.today().strftime('%Y-%m-%d %H:%M:%S')
+    log_file = 'logs/' + log_date + '.txt'
+    # Open the file in append mode
+    file = open(log_file, 'a')
+    #Append content to the file
+    file.write(f'{log_date_time}|{ip}|{session}|{string}\n')
+
+    # Close the file
+    file.close()
